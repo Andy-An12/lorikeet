@@ -1,0 +1,68 @@
+reboot_required:
+  bash: test ! -f /var/run/reboot-required
+
+# --- resource metrics ---
+
+disk_free:
+  system: disk_free
+  greater_than: 1048576 # KB, at least 1GB free
+
+disk_usage_percent:
+  bash: df / --output=pcent | tail -1 | tr -d '% '
+  less_than: 90
+
+mem_available:
+  system: mem_available
+  greater_than: 102400 # KB, at least 100MB free
+
+swap_free:
+  bash: free | awk '/Swap/ {print $4}'
+  greater_than: 0
+
+load_avg_1m:
+  system: load_avg1m
+  less_than: 4.0
+
+load_avg_5m:
+  system: load_avg5m
+  less_than: 4.0
+
+# --- security ---
+
+ssh_root_login_disabled:
+  bash: grep -Eq '^\s*PermitRootLogin\s+no' /etc/ssh/sshd_config && echo yes || echo no
+  matches: "yes"
+
+ssh_password_auth_disabled:
+  bash: grep -Eq '^\s*PasswordAuthentication\s+no' /etc/ssh/sshd_config && echo yes || echo no
+  matches: "yes"
+
+firewall_active:
+  bash: |-
+    command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active" && echo active || echo inactive
+  matches: "active"
+
+no_empty_password_accounts:
+  # requires root to read /etc/shadow
+  bash: |-
+    awk -F: '($2 == "") {print $1}' /etc/shadow 2>/dev/null | wc -l
+  matches: "0"
+
+world_writable_files:
+  bash: find / -xdev -type f -perm -0002 2>/dev/null | wc -l
+  matches: "0"
+
+# --- unattended-upgrades (ubuntu auto security patching) ---
+
+unattended_upgrades_installed:
+  bash: |-
+    dpkg -s unattended-upgrades 2>/dev/null | grep -q "^Status: install ok installed" && echo yes || echo no
+  matches: "yes"
+
+unattended_upgrades_enabled:
+  bash: grep -Eq 'APT::Periodic::Unattended-Upgrade\s+"1"' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null && echo yes || echo no
+  matches: "yes"
+
+apt_daily_upgrade_timer_active:
+  bash: systemctl is-active apt-daily-upgrade.timer 2>/dev/null
+  matches: "active"
